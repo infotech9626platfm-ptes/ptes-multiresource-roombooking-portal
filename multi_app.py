@@ -3,6 +3,7 @@ from PIL import Image
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timedelta
+import time  # NEW: Imported to handle the visual feedback pause
 
 # Page Configuration
 st.set_page_config(page_title="PTES Multi-Resource Booking", layout="wide")
@@ -111,6 +112,9 @@ with tab1:
                 # Success visual feedback animations
                 st.balloons()
                 st.success(f"✅ Success! {room_choice} has been reserved for {event_name}.")
+
+                # --- FIX: Pause execution for 3 seconds so animations display completely ---
+                time.sleep(3)
                 st.rerun()
         else:
             st.error("Please fill in all required fields.")
