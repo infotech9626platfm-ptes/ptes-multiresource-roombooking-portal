@@ -125,20 +125,23 @@ with tab2:
         # Create a working copy for processing filters and sorting layouts
         display_df = master_data.copy()
 
-        # --- UPDATED: 14-15 DAY HISTORICAL FILTER ---
+        # --- DYNAMIC 15-DAY PAST WINDOW FILTER ---
         # 1. Convert string date entries to true datetime objects temporarily
         display_df['datetime_obj'] = pd.to_datetime(display_df['Date'], format='%d/%m/%Y', errors='coerce')
         
-        # 2. Calculate the exact cutoff point (15 days ago from the current actual date)
-        past_cutoff = datetime.today() - timedelta(days=15)
+        # 2. Get today's raw timestamp at midnight for perfect comparative evaluation
+        today_date = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
         
-        # 3. Filter out rows older than 15 days ago from today (keeps today, future, and recent past)
-        display_df = display_df[display_df['datetime_obj'] >= past_cutoff]
+        # 3. Establish the strict past limit (15 days ago from current date)
+        past_limit = today_date - timedelta(days=15)
         
-        # 4. Sort chronologically in descending order (Latest/Future dates at the top)
+        # 4. Apply the strict range slice (Keep rows newer or equal to 15 days ago)
+        display_df = display_df[display_df['datetime_obj'] >= past_limit]
+        
+        # 5. Sort chronologically in descending order (Latest and future items on top)
         display_df = display_df.sort_values(by='datetime_obj', ascending=False)
         
-        # 5. Clean up temporary tracking column before rendering
+        # 6. Drop temporary sorting vector column before presentation rendering
         display_df = display_df.drop(columns=['datetime_obj'])
 
         # Filter/Search implementation over the processed data frame
@@ -147,7 +150,7 @@ with tab2:
             display_df = display_df[
                 display_df.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)]
 
-        # Render the clean sorted table to screen
+        # Render the clean sorted table to screen without index numbers
         st.dataframe(display_df, hide_index=True, use_container_width=True)
 
         # Retrieve Environment Secret Variable safely
@@ -162,7 +165,7 @@ with tab2:
             st.divider()
             st.write("### Admin: Cancel a Booking")
             
-            # Build choice strings using display_df layout order while tracking master index keys
+            # Build clean choice strings using display_df layout order while tracking master index keys
             booking_options = []
             for master_idx, row in display_df.iterrows():
                 description = f"{row['Name']} — {row['Room']} on {row['Date']} ({row['Time_Slot']})"
@@ -182,7 +185,7 @@ with tab2:
                     st.success("Booking deleted successfully.")
                     st.rerun()
             else:
-                st.info("No active current bookings available to cancel.")
+                st.info("No active current bookings available to cancel within the 15-day window.")
     else:
         st.info("No bookings found.")
 
