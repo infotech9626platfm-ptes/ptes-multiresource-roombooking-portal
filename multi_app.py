@@ -1,21 +1,19 @@
 import streamlit as st
 from PIL import Image
-
-# Load the PTES Logo
-logo = Image.open('ptes_logo.png')
-
-# Display logo at the top of the Sidebar
-st.sidebar.image(logo, use_container_width=True)
-
-# OR Display logo at the top of the Main Page
-# st.image(logo, width=100)
-
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
 # Page Configuration
 st.set_page_config(page_title="PTES Multi-Resource Booking", layout="wide")
+
+# Load the PTES Logo
+try:
+    logo = Image.open('ptes_logo.png')
+    # Display logo at the top of the Sidebar
+    st.sidebar.image(logo, use_container_width=True)
+except Exception:
+    st.sidebar.warning("Logo image 'ptes_logo.png' not found.")
 
 st.title("PUSAT TINGKATAN ENAM SENGKURONG")
 st.markdown("## Multi-Resource & Facility Booking Platform")
@@ -75,30 +73,29 @@ with tab1:
             # Load existing data to check for clashes
             existing_data = conn.read(ttl=0)
 
-            # Formulate the check
-            formatted_date = booking_date.strftime("%d/%m/%Y")
+            # Ensure consistent date formatting strings
+            formatted_date = booking_date.strftime("%Y-%m-%d")
+            
+            # CRITICAL FIX: Extract clean value ("Morning", "Afternoon", "Whole Day")
+            clean_slot_db_value = time_slots[slot_choice]
 
             # 1. Filter existing data for the SAME date and SAME room
             same_day_room = existing_data[
-                (existing_data['Date'] == formatted_date) &
+                (existing_data['Date'].astype(str) == formatted_date) &
                 (existing_data['Room'] == room_choice)
-                ]
+            ]
 
-            # 2. Smart Clash Logic: Find ANY overlap
-            # A clash occurs if:
-            # - Any existing booking is "Whole Day"
-            # - OR the NEW booking is "Whole Day"
-            # - OR the time slots match exactly
+            # 2. Updated Smart Clash Logic: Compares shorthand database values cleanly
             clash = same_day_room[
-                (same_day_room['Time_Slot'].str.contains("Whole Day", na=False)) |
-                ("Whole Day" in slot_choice) |
-                (same_day_room['Time_Slot'] == slot_choice)
-                ]
+                (same_day_room['Time_Slot'] == "Whole Day") | 
+                (clean_slot_db_value == "Whole Day") | 
+                (same_day_room['Time_Slot'] == clean_slot_db_value)
+            ]
 
             if not clash.empty:
-                st.error(f"❌ CLASH DETECTED: {room_choice} is already booked for {slot_choice} on {formatted_date}.")
+                st.error(f"❌ CLASH DETECTED: {room_choice} is already booked for {clean_slot_db_value} on {formatted_date}.")
             else:
-                # Add new booking
+                # Add new booking mapping exactly to your 7 clean headers
                 new_entry = pd.DataFrame([{
                     "Name": name,
                     "Department": dept,
@@ -106,13 +103,14 @@ with tab1:
                     "Event": event_name,
                     "Room": room_choice,
                     "Date": formatted_date,
-                    "Time_Slot": slot_choice
+                    "Time_Slot": clean_slot_db_value
                 }])
 
                 updated_df = pd.concat([existing_data, new_entry], ignore_index=True)
                 conn.update(data=updated_df)
                 st.success(f"✅ Success! {room_choice} has been reserved for {event_name}.")
                 st.balloons()
+                st.rerun()
         else:
             st.error("Please fill in all required fields.")
 
@@ -128,16 +126,14 @@ with tab2:
             schedule_data = schedule_data[
                 schedule_data.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)]
 
-        # st.dataframe(schedule_data, use_container_width=True)
+        # Display full screen datatable cleanly
         st.dataframe(schedule_data, hide_index=True, use_container_width=True)
-        # st.dataframe(df, hide_index=True)
 
         # Admin Delete Logic
-        if admin_password == "admin123":  # Change this to your preferred password
+        if admin_password == "admin123":  
             st.divider()
             st.write("### Admin: Cancel a Booking")
-            row_to_delete = st.number_input("Enter Row Index to Delete", min_value=0, max_value=len(schedule_data) - 1,
-                                            step=1)
+            row_to_delete = st.number_input("Enter Row Index to Delete", min_value=0, max_value=len(schedule_data) - 1, step=1)
             if st.button("Delete Selected Booking"):
                 schedule_data = schedule_data.drop(schedule_data.index[row_to_delete])
                 conn.update(data=schedule_data)
@@ -148,8 +144,6 @@ with tab2:
 
 # --- FOOTER ---
 st.markdown("---")
-
-# Using a single container with centered alignment
 st.markdown(
     """
     <div style="text-align: center; width: 100%;">
@@ -162,9 +156,9 @@ st.markdown(
             <span style="color: #0070FF;">🔵 Quality Education</span> | 
             <span style="color: #28A745;">🟢 Equipping 21st century Skills</span>
         </p>
-        <p style="color: gray; font-size: 14px; margin-top: 10px;">
+        <div style="color: gray; font-size: 14px; margin-top: 10px;">
             Creator: Miss Hajah Nurul Haziqah HN (PTES CS Tutor)
-        </p>
+        </div>
     </div>
     """,
     unsafe_allow_html=True
