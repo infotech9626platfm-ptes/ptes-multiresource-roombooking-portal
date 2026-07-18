@@ -37,7 +37,7 @@ with st.sidebar:
 # 3. Define Resource Options
 room_list = [
     "Lecture Theater One", "Lecture Theater Two", "Multi Purpose Hall", "Multi Media Theater",
-    "Admin Lobby Area", "Staff Lounge", "Conference Room", "Prayer's Hall / Musalla",
+    "Admin Lobby Area", "Staff Lounge", "Conference Room", "GREEN Area", "Students' Affair Area", "Canteen Area", "Prayer's Musalla"
 ]
 
 # Time Slots Mapping
@@ -59,11 +59,11 @@ with tab1:
 
         with col1:
             name = st.text_input("Lecturer Name")
-            dept = st.selectbox("Position / Department", ["Arts&Design&Media", "Science", "Humanities", "Mathematics", "Languages", "Religious Studies","Administration", "Others"])
+            dept = st.selectbox("Organisation", ["STEAM", "PIBG", "SportHouse", "Mathematics", "ICT Related", "Religious", "Administration", "Sciences", "Assembly", "Others"])
             wa_num = st.text_input("Active WhatsApp Number (e.g. +673...)")
 
         with col2:
-            event_name = st.text_input("Event Name / Purpose")
+            event_name = st.text_input("Event Title / Purpose")
             room_choice = st.selectbox("Select Room / Facility", room_list)
             booking_date = st.date_input("Date of Booking", min_value=datetime.today(), format="DD/MM/YYYY")
             slot_choice = st.selectbox("Time Duration", list(time_slots.keys()))
