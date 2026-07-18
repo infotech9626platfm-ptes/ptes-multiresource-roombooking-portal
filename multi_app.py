@@ -10,7 +10,6 @@ st.set_page_config(page_title="PTES Multi-Resource Booking", layout="wide")
 # Load the PTES Logo
 try:
     logo = Image.open('ptes_logo.png')
-    # Display logo at the top of the Sidebar
     st.sidebar.image(logo, use_container_width=True)
 except Exception:
     st.sidebar.warning("Logo image 'ptes_logo.png' not found.")
@@ -63,7 +62,9 @@ with tab1:
         with col2:
             event_name = st.text_input("Event Name / Purpose")
             room_choice = st.selectbox("Select Room / Facility", room_list)
-            booking_date = st.date_input("Date of Booking", min_value=datetime.today())
+            
+            # DATE FIX 1: Format visual interface dropdown widget to DD/MM/YYYY
+            booking_date = st.date_input("Date of Booking", min_value=datetime.today(), format="DD/MM/YYYY")
             slot_choice = st.selectbox("Time Duration", list(time_slots.keys()))
 
         submit = st.form_submit_button("Confirm Booking")
@@ -73,10 +74,10 @@ with tab1:
             # Load existing data to check for clashes
             existing_data = conn.read(ttl=0)
 
-            # Ensure consistent date formatting strings
-            formatted_date = booking_date.strftime("%Y-%m-%d")
+            # DATE FIX 2: Format Python string storage representation to dd/mm/yyyy
+            formatted_date = booking_date.strftime("%d/%m/%Y")
             
-            # CRITICAL FIX: Extract clean value ("Morning", "Afternoon", "Whole Day")
+            # Extract clean value ("Morning", "Afternoon", "Whole Day")
             clean_slot_db_value = time_slots[slot_choice]
 
             # 1. Filter existing data for the SAME date and SAME room
@@ -85,7 +86,7 @@ with tab1:
                 (existing_data['Room'] == room_choice)
             ]
 
-            # 2. Updated Smart Clash Logic: Compares shorthand database values cleanly
+            # 2. Smart Clash Logic
             clash = same_day_room[
                 (same_day_room['Time_Slot'] == "Whole Day") | 
                 (clean_slot_db_value == "Whole Day") | 
@@ -102,7 +103,7 @@ with tab1:
                     "WhatsApp": wa_num,
                     "Event": event_name,
                     "Room": room_choice,
-                    "Date": formatted_date,
+                    "Date": formatted_date,  # Saved as dd/mm/yyyy string
                     "Time_Slot": clean_slot_db_value
                 }])
 
@@ -116,7 +117,6 @@ with tab1:
 
 with tab2:
     st.subheader("Current Booking Schedule")
-    # Read data
     schedule_data = conn.read(ttl=0)
 
     if not schedule_data.empty:
@@ -126,7 +126,7 @@ with tab2:
             schedule_data = schedule_data[
                 schedule_data.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)]
 
-        # Display full screen datatable cleanly
+        # Display full screen datatable cleanly (Dates show up exactly as written in sheet strings)
         st.dataframe(schedule_data, hide_index=True, use_container_width=True)
 
         # Admin Delete Logic
