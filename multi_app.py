@@ -41,10 +41,9 @@ room_list = [
 ]
 
 time_slots = {
-    "Morning (08:00 - 9:30)": "Morning8am",
-    "Morning (10:00 - 12:00)" : "Morning10am",
-    "Afternoon (13:00 - 16:30)": "Afternoon1pm",
-    "Whole Day (08:00 - 15:30)": "Whole Day8am4pm"
+    "Morning (08:00 - 11:30)": "Morning",
+    "Afternoon (13:00 - 16:30)": "Afternoon",
+    "Whole Day (08:00 - 15:30)": "Whole Day"
 }
 
 # 4. Tabs for Navigation
