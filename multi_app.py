@@ -39,10 +39,12 @@ room_list = [
     "Admin Lobby Area", "Staff Lounge", "Conference Room", "Prayer's Hall / Musalla",
 ]
 
+# Time Slots Mapping
 time_slots = {
-    "Morning (08:00 - 11:30)": "Morning",
-    "Afternoon (13:00 - 16:30)": "Afternoon",
-    "Whole Day (08:00 - 15:30)": "Whole Day"
+    "(08:00-09:30) Assembly": "Assembly",
+    "(10:00-12:00) Morning": "Morning",
+    "(13:30-15:30) Afternoon": "Afternoon",
+    "(08:00-12:00) Whole Day": "Whole Day"
 }
 
 # 4. Tabs for Navigation
@@ -62,8 +64,6 @@ with tab1:
         with col2:
             event_name = st.text_input("Event Name / Purpose")
             room_choice = st.selectbox("Select Room / Facility", room_list)
-            
-            # DATE FIX 1: Format visual interface dropdown widget to DD/MM/YYYY
             booking_date = st.date_input("Date of Booking", min_value=datetime.today(), format="DD/MM/YYYY")
             slot_choice = st.selectbox("Time Duration", list(time_slots.keys()))
 
@@ -71,46 +71,51 @@ with tab1:
 
     if submit:
         if name and event_name and wa_num:
-            # Load existing data to check for clashes
+            # Load existing data from Google Sheet
             existing_data = conn.read(ttl=0)
 
-            # DATE FIX 2: Format Python string storage representation to dd/mm/yyyy
+            # Format selected date object into string representation matching sheet records
             formatted_date = booking_date.strftime("%d/%m/%Y")
-            
-            # Extract clean value ("Morning", "Afternoon", "Whole Day")
             clean_slot_db_value = time_slots[slot_choice]
 
-            # 1. Filter existing data for the SAME date and SAME room
+            # 1. Filter existing data for the exact same date and room choice
             same_day_room = existing_data[
                 (existing_data['Date'].astype(str) == formatted_date) &
                 (existing_data['Room'] == room_choice)
             ]
 
-            # 2. Smart Clash Logic
+            # 2. Strict Clash Logic
+            # A conflict triggers if:
+            # - The exact same slot is selected
+            # - OR an existing booking is "Whole Day"
+            # - OR the new booking request is "Whole Day" (blocking all slots)
             clash = same_day_room[
-                (same_day_room['Time_Slot'] == "Whole Day") | 
-                (clean_slot_db_value == "Whole Day") | 
-                (same_day_room['Time_Slot'] == clean_slot_db_value)
+                (same_day_room['Time_Slot'] == clean_slot_db_value) |
+                (same_day_room['Time_Slot'] == "Whole Day") |
+                (clean_slot_db_value == "Whole Day")
             ]
 
             if not clash.empty:
-                st.error(f"❌ CLASH DETECTED: {room_choice} is already booked for {clean_slot_db_value} on {formatted_date}.")
+                st.error(f"❌ CLASH DETECTED: {room_choice} is unavailable on {formatted_date} due to a conflicting reservation.")
             else:
-                # Add new booking mapping exactly to your 7 clean headers
+                # Prepare data dictionary payload using the new clean time values
                 new_entry = pd.DataFrame([{
                     "Name": name,
                     "Department": dept,
                     "WhatsApp": wa_num,
                     "Event": event_name,
                     "Room": room_choice,
-                    "Date": formatted_date,  # Saved as dd/mm/yyyy string
+                    "Date": formatted_date, 
                     "Time_Slot": clean_slot_db_value
                 }])
 
+                # Append and upload data structure to cloud
                 updated_df = pd.concat([existing_data, new_entry], ignore_index=True)
                 conn.update(data=updated_df)
-                st.success(f"✅ Success! {room_choice} has been reserved for {event_name}.")
+                
+                # Success triggers and visual feedback
                 st.balloons()
+                st.success(f"✅ Success! {room_choice} has been reserved for {event_name}.")
                 st.rerun()
         else:
             st.error("Please fill in all required fields.")
@@ -120,17 +125,23 @@ with tab2:
     schedule_data = conn.read(ttl=0)
 
     if not schedule_data.empty:
-        # Filter/Search feature
+        # Filtering query interface lookup
         search_query = st.text_input("Search by Room or Lecturer Name")
         if search_query:
             schedule_data = schedule_data[
                 schedule_data.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)]
 
-        # Display full screen datatable cleanly (Dates show up exactly as written in sheet strings)
         st.dataframe(schedule_data, hide_index=True, use_container_width=True)
 
-        # Admin Delete Logic
-        if admin_password == "admin123":  
+        # Retrieve Environment Secret Variable safely
+        try:
+            target_password = st.secrets["admin_password"]
+        except KeyError:
+            target_password = None
+            st.sidebar.error("Secrets Configuration Missing: 'admin_password' not found.")
+
+        # Protected administrative deletion logic
+        if target_password and admin_password == target_password:  
             st.divider()
             st.write("### Admin: Cancel a Booking")
             row_to_delete = st.number_input("Enter Row Index to Delete", min_value=0, max_value=len(schedule_data) - 1, step=1)
